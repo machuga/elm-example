@@ -3,8 +3,6 @@ module Main exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (class, placeholder, type_, value, style, href)
 import Html.Events exposing (onClick, onInput, onSubmit)
-import Http
-import Json.Decode as Decode exposing (Decoder, field, succeed)
 
 
 type alias GitHubLabel =
@@ -32,7 +30,6 @@ type alias Model =
 type Msg
     = SetRepo String
     | FetchIssues
-    | LoadIssues (Result Http.Error (List GitHubIssue))
 
 
 initialModel : Model
@@ -57,33 +54,6 @@ testIssue =
     }
 
 
-fetchIssues : String -> Cmd Msg
-fetchIssues repo =
-    Http.send LoadIssues (Http.get (repoUrl repo) (Decode.list issueDecoder))
-
-
-repoUrl : String -> String
-repoUrl repo =
-    "https://api.github.com/repos/" ++ repo ++ "/issues"
-
-
-issueDecoder : Decoder GitHubIssue
-issueDecoder =
-    Decode.map5 GitHubIssue
-        (field "title" Decode.string)
-        (field "body" Decode.string)
-        (field "html_url" Decode.string)
-        (field "comments" Decode.int)
-        (field "labels" (Decode.list labelDecoder))
-
-
-labelDecoder : Decoder GitHubLabel
-labelDecoder =
-    Decode.map2 GitHubLabel
-        (field "name" Decode.string)
-        (field "color" Decode.string)
-
-
 
 -- Update
 
@@ -103,20 +73,22 @@ init =
     ( initialModel, Cmd.none )
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : Msg -> Model -> ( Model, Cmd msg )
 update msg model =
     case msg of
         SetRepo repo ->
             ( { model | repo = repo, alert = Nothing }, Cmd.none )
 
         FetchIssues ->
-            ( model, (fetchIssues model.repo) )
-
-        LoadIssues (Ok issues) ->
-            ( { model | issues = issues }, Cmd.none )
-
-        LoadIssues (Err error) ->
-            ( { model | alert = Just "Try another repo." }, Cmd.none )
+            if model.repo == "elm-lang/elm" then
+                ( { model | issues = [ testIssue ] }, Cmd.none )
+            else
+                ( { model
+                    | issues = []
+                    , alert = Just "Try another repo"
+                  }
+                , Cmd.none
+                )
 
 
 
@@ -133,7 +105,7 @@ view model =
         ]
 
 
-alertView : Maybe String -> Html msg
+alertView : Maybe String -> Html Msg
 alertView alert =
     case alert of
         Just msg ->
